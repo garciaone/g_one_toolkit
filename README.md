@@ -1,4 +1,4 @@
-# gOneToolKitV1
+# g_one_toolkit
 
 A collection of quality of life nodes
 
@@ -21,7 +21,7 @@ A collection of quality of life nodes
 To install the dev dependencies and pre-commit (will run the ruff hook), do:
 
 ```bash
-cd gOneToolKitV1
+cd g_one_toolkit
 pip install -e .[dev]
 pre-commit install
 ```
@@ -42,7 +42,7 @@ git push
 
 ## Writing custom nodes
 
-An example custom node is located in [node.py](src/gOneToolKitV1/nodes.py). To learn more, read the [docs](https://docs.comfy.org/essentials/custom_node_overview).
+An example custom node is located in [node.py](src/g_one_toolkit/nodes.py). To learn more, read the [docs](https://docs.comfy.org/essentials/custom_node_overview).
 
 
 ## Tests
