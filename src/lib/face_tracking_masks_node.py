@@ -52,12 +52,18 @@ from mediapipe import solutions
 import torch
 import heapq
 from scipy.spatial import Delaunay
+from pathlib import Path
 
 mp_drawing = mp.solutions.drawing_utils
 FM         = mp.solutions.face_mesh
 _FM = mp.solutions.face_mesh
 
 DEBUG = False
+
+############## Mediapipe Model Path
+
+current_module_path = str(Path(__file__).resolve().parent)
+model_path = current_module_path + "/mediaPipe_model/face_landmarker.task"
 
 ######################################################### Node Function
 def trackFaceMasks(images,**kargs):
@@ -83,7 +89,7 @@ def trackFaceMasks(images,**kargs):
 
     TRIS = None
     # ----------- Detector setup -----------
-    base_options = python.BaseOptions(model_asset_path="./custom_nodes/g_one_toolkit/src/lib/mediaPipe_model/face_landmarker.task")
+    base_options = python.BaseOptions(model_asset_path = model_path)
     options = vision.FaceLandmarkerOptions(
         base_options=base_options,
         num_faces=1,
@@ -137,8 +143,8 @@ def trackFaceMasks(images,**kargs):
                        "R_Cheek": None
                       }
 
-    mask_selection_set = mask_selections[mask_selection]
-    optional_selection_set = mask_selections[optional_selection]
+    mask_selection_set_0 = mask_selections[mask_selection]
+    optional_selection_set_0 = mask_selections[optional_selection]
 
     # ----------- Process frames in `images` (each HxWxC RGB tensor/array) -----------
     is_single = hasattr(images, "ndim") and images.ndim == 3
@@ -146,6 +152,12 @@ def trackFaceMasks(images,**kargs):
 
     for frame_idx, frame in enumerate(frames):
         print(f"Tracking Face Masks : Processing frame {frame_idx+1}/{len(frames)}...")
+
+
+        ### Reset the selection set on each frame , avoids compounding growth selections that animate over time. 
+        mask_selection_set = mask_selection_set_0
+        optional_selection_set = optional_selection_set_0
+
 
         if isinstance(frame, torch.Tensor):frame = frame.detach().cpu().numpy()
 

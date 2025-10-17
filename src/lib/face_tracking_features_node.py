@@ -40,6 +40,13 @@ from mediapipe.tasks.python import vision
 from mediapipe.framework.formats import landmark_pb2
 from mediapipe import solutions
 import torch
+from pathlib import Path
+
+############## Mediapipe Model Path
+
+current_module_path = str(Path(__file__).resolve().parent  )
+model_path = current_module_path + "/mediaPipe_model/face_landmarker.task"
+
 
 # ---------- MediaPipe aliases ----------
 mp_drawing = mp.solutions.drawing_utils
@@ -196,7 +203,7 @@ def trackFaceFeatures(images,**kargs):
     RENDER_CFG["verts"].update({"on": kargs["face_points_vis"], "radius": kargs["face_points_radius"]}) 
 
     # ----------- Detector setup -----------
-    base_options = python.BaseOptions(model_asset_path="./custom_nodes/g_one_toolkit/src/lib/mediaPipe_model/face_landmarker.task")
+    base_options = python.BaseOptions(model_asset_path = model_path)
     options = vision.FaceLandmarkerOptions(
         base_options=base_options,
         num_faces=1,
