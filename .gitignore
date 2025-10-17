@@ -40,7 +40,6 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
 lib64/
 parts/
 sdist/
@@ -99,7 +98,7 @@ cookiecutter-pypackage-env/
 .history/
 *.code-workspace
 
-# Frontend extension
+# Frontend extension -
 node_modules/
 .env
 .env.local
