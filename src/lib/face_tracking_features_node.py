@@ -7,21 +7,15 @@
 # Email:          garciaone@gmail.com
 #
 # Functionality:
-#   - MediaPipe Tasks (FaceLandmarker) in VIDEO mode with per-frame timestamps
-#   - Configurable render groups via RENDER_CFG:
-#       * Left/Right eyebrows, Left/Right eyelids, Lips, Face oval
-#       * Irises as fitted circles (radius scale / fill / thickness)
-#       * Optional vertex dots (tracking markers)
-#   - Converts ComfyUI IMAGE tensors/arrays to uint8 RGB for detection
-#   - Overlays on original image or black background (background_image_vis)
-#   - Returns processed frames in the original IMAGE tensor structure
+#  - Facial features tracked to face mesh.
+#  - Selectable facial features.
+#  - Multiple eye render options.
+#  - Thickness control.
 #
 # To Do:
-#   - [ ] Add temporal smoothing (EMA) for landmarks to reduce jitter
-#   - [ ] Cache detector instance across calls (avoid re-creating per run)
-#   - [ ] Multi-face support (iterate & draw up to N faces)
-#   - [ ] Expose color pickers / presets via UI or hex parsing
-#   - [ ] Optional tessellation/contours overlay toggle
+#  - General clean up of code and refactoring. 
+#  - Additional testing / unit testing needs to be set up. 
+#  - Allow multiple face generation.
 #
 # Dependencies:
 #   - Python >= 3.10 (recommended)
@@ -41,6 +35,8 @@ from mediapipe.framework.formats import landmark_pb2
 from mediapipe import solutions
 import torch
 from pathlib import Path
+import copy
+
 
 ############## Mediapipe Model Path
 
@@ -59,7 +55,7 @@ LEFT_IRIS  = [473, 474, 475, 476, 477]
 
 
 # ---------- Per-group render settings ----------
-RENDER_CFG = {
+RENDER_CFG_0 = {
     # Face shape (jaw/oval)
     "face_oval": {"on": False,  "thickness": 2, "color": (255, 100, 100)},
     # Eyebrows
@@ -84,10 +80,9 @@ def _fit_circle_px(face_landmarks, indices, w, h):
     (cx, cy), r = cv2.minEnclosingCircle(np.array(pts, dtype=np.int32))
     return (int(cx), int(cy)), float(r)
 
-def draw_face_features(frame_bgr, face_landmarks, cfg=RENDER_CFG):
+def draw_face_features(frame_bgr, face_landmarks, cfg=RENDER_CFG_0):
     """
     face_landmarks: iterable of NormalizedLandmark
-    cfg: dict like RENDER_CFG above
     """
     h, w = frame_bgr.shape[:2]
 
@@ -179,11 +174,19 @@ def draw_face_features(frame_bgr, face_landmarks, cfg=RENDER_CFG):
 
 def trackFaceFeatures(images,**kargs):
 
+    RENDER_CFG = copy.deepcopy(RENDER_CFG_0)
     frame_rate = kargs["frame_rate"]
     min_face_det_conf = kargs["min_face_detection_confidence"]
     min_face_pres_conf = kargs["min_face_presence_confidence"]
     min_track_conf = kargs["min_tracking_confidence"]
-    background_image_vis = kargs["background_image_vis"]
+    output_mode = kargs["output_mode"]
+
+
+    if output_mode == "mask":
+        for v in RENDER_CFG.values():
+            if "color" in v:
+                v["color"] = (255, 255, 255)
+
 
     RENDER_CFG["l_eye"].update({"on": kargs["l_eye_lid_vis"], "thickness": kargs["eye_lid_thickness"]})
     RENDER_CFG["r_eye"].update({"on": kargs["r_eye_lid_vis"], "thickness": kargs["eye_lid_thickness"]})
@@ -192,15 +195,14 @@ def trackFaceFeatures(images,**kargs):
     RENDER_CFG["r_iris"].update({"on": kargs["r_eye_vis"], "thickness": kargs["eye_thickness"]})
     RENDER_CFG["r_iris"].update({"fill": kargs["eye_fill"], "radius_scale": kargs["eye_radius"]})
     RENDER_CFG["l_iris"].update({"fill": kargs["eye_fill"], "radius_scale": kargs["eye_radius"]})
-    
-    RENDER_CFG["l_brow"].update({"on": kargs["l_eye_brow_vis"], "thickness": kargs["eye_brow_thickness"]})
-    RENDER_CFG["r_brow"].update({"on": kargs["r_eye_brow_vis"], "thickness": kargs["eye_brow_thickness"]})
-
+    RENDER_CFG["l_brow"].update({"on": kargs["l_eyebrow_vis"], "thickness": kargs["eyebrow_thickness"]})
+    RENDER_CFG["r_brow"].update({"on": kargs["r_eyebrow_vis"], "thickness": kargs["eyebrow_thickness"]})
     RENDER_CFG["lips"].update({"on": kargs["lips_vis"], "thickness": kargs["lips_thickness"]})
-
     RENDER_CFG["face_oval"].update({"on": kargs["face_oval_vis"], "thickness": kargs["face_oval_thickness"]}) 
-
     RENDER_CFG["verts"].update({"on": kargs["face_points_vis"], "radius": kargs["face_points_radius"]}) 
+
+
+
 
     # ----------- Detector setup -----------
     base_options = python.BaseOptions(model_asset_path = model_path)
@@ -241,7 +243,7 @@ def trackFaceFeatures(images,**kargs):
         ts_ms = int((frame_idx / frame_rate) * 1000)
         result = detector.detect_for_video(mp_image, ts_ms)
 
-        if background_image_vis:
+        if output_mode == "visualisation":
             bg_frame = frame
         else:
             bg_frame = np.full_like(frame, fill_value=(0, 0, 0))

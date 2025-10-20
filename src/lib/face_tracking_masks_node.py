@@ -6,31 +6,25 @@
 # Author:         Beau Garcia
 # Email:          garciaone@gmail.com
 #
-# Functionality:
-#   - Build region index sets from MediaPipe connection groups
-#   - Create hard masks:
-#       * convex-hull from unordered indices
-#       * concave polygon fill from ordered loops
-#   - Soften masks in image space via signed distance + smoothstep
-#   - Mesh-aware soft falloff:
-#       * geodesic-like per-vertex weights (Dijkstra on FACEMESH_TESSELATION)
-#       * barycentric rasterization over a fixed triangle list (TRIS)
-#   - Selection growth on the mesh (expand N edge hops)
-#   - One-off Delaunay triangulation from first frame to stabilize TRIS
-#   - Landmark index overlay for debugging/selection authoring
-#   - ComfyUI node `trackFaceMasks(...)`:
-#       * VIDEO-mode Face Landmarker per frame (timestamps)
-#       * Simple 2D masks or mesh-aware 3D falloff
-#       * Optional dual selections + union (max) and post Gaussian blur
-#       * Visualization mode (tessellation + indices)
-#
+#  Functionality:
+#  - Facial masks mapped to 3D mesh.
+#  - Multiple isolated facial masks.
+#  - Face tracking (MediaPipe Face Landmarker model)
+#  - Hard / Soft Masks
+#  - Mask region expansion 
+#  - Mask falloff options: 
+#     - "simple-2D": Fast method. Simple 2D falloff in pixel space. The core mask is still mapped in 3D space, but the falloff is in screen space. Best for front-on perspectives. 
+#     - "mesh-aware-3D": Slower method. Creates a falloff that follows the contours of the face on the face mesh directly. Note: This method currently has some known bugs and is currently prone to artifacts.
+# 
 # To Do:
-#   - [ ] Implement temporal smoothing (EMA) for landmarks and/or per-vertex weights
-#   - [ ] Cache canonical 468/478 triangulation (avoid per-run Delaunay)
-#   - [ ] Robust eye/iris handling inside mesh-aware masks (optional hole fill)
-#   - [ ] Multi-face support (track multiple faces & per-face state)
-#   - [ ] Expose more regions (forehead/cheeks) with better loops or UV masks
-#   - [ ] Add unit tests for mask generators and selection growth
+#  - General clean-up of code and refactoring. 
+#  - Additional testing / unit testing needs to be set up. 
+#  - Fix first frame pop, feather falloff and artifacts in mesh-aware-3D mode.
+#  - Update method of generating surfacing from face mesh verts. Currently, it uses a convex hull for simplicity; however, this causes issues when representing facial contours accurately.
+#  - All outputs are generated as images of type RGB BxWxHxC. An optional direct mask output type will be included.
+#  - Mesh-aware-3D has limitations due to the face mesh topology produced by the MediaPipe Face Landmarker model, resulting in occasional artefacts in the mask. This can mostly be resolved by falloff settings and post-2D blur. More work can be done to make this option more robust overall. 
+#  - Falloff settings need to be further normalised to ensure a less drastic shift in the output due to falloff method switching. 
+#  - Allow multiple face generation.
 #
 # Dependencies:
 #   - Python >= 3.10 (recommended)
@@ -80,7 +74,7 @@ def trackFaceMasks(images,**kargs):
     inner_falloff = kargs["inner_falloff"]
     feather_falloff = kargs["feather_falloff"]
     post_blur = kargs["post_blur_2D"]
-    visualization_mode = kargs["visualization_mode"]
+    output_mode = kargs["output_mode"]
     vis_colour = kargs["vis_colour"]
     post_remap_in_min = kargs["post_remap_in_min"]
     post_remap_in_max = kargs["post_remap_in_max"]
@@ -171,7 +165,7 @@ def trackFaceMasks(images,**kargs):
         ts_ms = int((frame_idx / frame_rate) * 1000)
         result = detector.detect_for_video(mp_image, ts_ms)
 
-        if visualization_mode: bg_frame = frame
+        if output_mode == "visualisation": bg_frame = frame
         else: bg_frame = np.full_like(frame, fill_value=(0, 0, 0)) ## Black background
         frame_bgr = cv2.cvtColor(bg_frame, cv2.COLOR_RGB2BGR) ## to BGR for OpenCV drawing
         frame_bgr_f32   = frame_bgr.astype(np.float32) # to float32 avoids uint8 wrap/rounding
@@ -247,7 +241,7 @@ def trackFaceMasks(images,**kargs):
 
                     if optional_selection_set != None or mask_selection_set != None:
 
-                        if visualization_mode:
+                        if output_mode == "visualisation":
                             tint  = np.array([colourBGR[0], colourBGR[1], colourBGR[2]], dtype=frame_bgr_f32.dtype) 
                         else:
                             tint  = np.array([255, 255, 255], dtype=frame_bgr_f32.dtype) 
@@ -343,7 +337,7 @@ def trackFaceMasks(images,**kargs):
 
                     if optional_selection_set != None or mask_selection_set != None:
 
-                        if visualization_mode:
+                        if output_mode == "visualisation":
                             tint  = np.array([colourBGR[0], colourBGR[1], colourBGR[2]], dtype=frame_bgr_f32.dtype) 
                         else:
                             tint  = np.array([255, 255, 255], dtype=frame_bgr_f32.dtype) 
@@ -358,7 +352,7 @@ def trackFaceMasks(images,**kargs):
                         frame_bgr = comp_out
 
                 ### draw mesh if in visualization mode
-                if visualization_mode:
+                if output_mode == "visualisation":
                     face_proto = landmark_pb2.NormalizedLandmarkList()
 
                     face_proto.landmark.extend(
