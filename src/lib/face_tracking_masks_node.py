@@ -50,10 +50,7 @@ from pathlib import Path
 
 mp_drawing = mp.solutions.drawing_utils
 FM         = mp.solutions.face_mesh
-_FM = mp.solutions.face_mesh
-
 DEBUG = False
-
 ############## Mediapipe Model Path
 
 current_module_path = str(Path(__file__).resolve().parent)
@@ -487,7 +484,7 @@ def mesh_soft_falloff_mask(frame_shape, landmarks, seed_indices,
     # adjacency from tessellation (build once per run)
     N = len(landmarks)
     adj = [[] for _ in range(max(N, 478))]
-    for a,b in _FM.FACEMESH_TESSELATION:
+    for a,b in FM.FACEMESH_TESSELATION:
         if a < N and b < N:
             adj[a].append(b); adj[b].append(a)
 
