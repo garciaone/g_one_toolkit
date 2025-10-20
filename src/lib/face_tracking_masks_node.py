@@ -63,7 +63,6 @@ def trackFaceMasks(images,**kargs):
     min_face_det_conf = kargs["min_face_detection_confidence"]
     min_face_pres_conf = kargs["min_face_presence_confidence"]
     min_track_conf = kargs["min_tracking_confidence"]
-    # temporal_smooth = kargs["temporal_smooth"] ## Temporal smoothing not implemented yet
     falloff_mode = kargs["falloff_mode"]
     mask_selection = kargs["mask_selection"]
     optional_selection = kargs["optional_selection"]
@@ -77,9 +76,9 @@ def trackFaceMasks(images,**kargs):
     post_remap_in_max = kargs["post_remap_in_max"]
     post_remap_out_min = kargs["post_remap_out_min"]
     post_remap_out_max = kargs["post_remap_out_max"]
-
     TRIS = None
-    # ----------- Detector setup -----------
+
+    ###### Detector setup 
     base_options = python.BaseOptions(model_asset_path = model_path)
     options = vision.FaceLandmarkerOptions(
         base_options=base_options,
@@ -102,7 +101,6 @@ def trackFaceMasks(images,**kargs):
     IDX_OVAL    = indices_from_connections(FM.FACEMESH_FACE_OVAL)
     IDX_NOSE    =  [ 6, 197, 195, 5, 4,1,19,94,419,248,281,275,274,354,370,456,363,440,457,461,462,196,3,51,45,44,125,141,236,134,220,237,241,141,360,456,420,429,279,168,278,455,305,290,328,198,131,49,99,240,235,48,236,456,122,351,174,399]
     IDX_CHIN    =  [199,175,396,171,208,428]
-    # IDX_BROW_RIDGE  =  [46,53,52,65,55,8,285,295,282,283,276,300,293,334,296,336,9,107,66,105,63,70,46] Convex version
     IDX_BROW_RIDGE  =  [107,55,8,285,336,9,107]
 
     colour_select = {"White":[255,255,255],
@@ -137,18 +135,21 @@ def trackFaceMasks(images,**kargs):
     mask_selection_set_0 = mask_selections[mask_selection]
     optional_selection_set_0 = mask_selections[optional_selection]
 
-    # ----------- Process frames in `images` (each HxWxC RGB tensor/array) -----------
+    #### Added to normalize values when switching fall off methods, but needs further experimentation. 
+    if falloff_mode == "mesh-aware-3D":
+        feather_falloff_n = feather_falloff
+        inner_falloff_n = inner_falloff
+
+    # Process frames in `images` (each HxWxC RGB tensor/array) 
     is_single = hasattr(images, "ndim") and images.ndim == 3
     frames = [images] if is_single else list(images)
 
     for frame_idx, frame in enumerate(frames):
         print(f"Tracking Face Masks : Processing frame {frame_idx+1}/{len(frames)}...")
 
-
         ### Reset the selection set on each frame , avoids compounding growth selections that animate over time. 
         mask_selection_set = mask_selection_set_0
         optional_selection_set = optional_selection_set_0
-
 
         if isinstance(frame, torch.Tensor):frame = frame.detach().cpu().numpy()
 
@@ -255,12 +256,8 @@ def trackFaceMasks(images,**kargs):
                 ##### mesh-aware-3D mode: use soft falloff masks from 3D mesh distances #####
                 if falloff_mode == "mesh-aware-3D":
 
-                    #### Proxy normlize input values
-                    inner_falloff /= 100.0
-                    feather_falloff /= 100.0
-
-                    if TRIS is None and result.face_landmarks: # init TRIS once
-                        TRIS = build_tris_once(result.face_landmarks[0])
+                    if TRIS is None and face: # init TRIS once
+                        TRIS = build_tris_once(face)
 
                     if mask_selection_set != None: ############## Main Mask Selection
 
@@ -273,9 +270,9 @@ def trackFaceMasks(images,**kargs):
                                 mask_selection_set_02 = expand_selection(mask_selection_set_02, steps=grow_selection, n_vertices=len(face))
                                 mask_selection_set_03 = expand_selection(mask_selection_set_03, steps=grow_selection, n_vertices=len(face))
 
-                            mask_S01 = mesh_soft_falloff_mask(frame_bgr.shape, face, mask_selection_set_01, TRIS, inner=inner_falloff, feather=feather_falloff, space="3d")
-                            mask_S02 = mesh_soft_falloff_mask(frame_bgr.shape, face, mask_selection_set_02, TRIS, inner=inner_falloff, feather=feather_falloff, space="3d")
-                            mask_S03 = mesh_soft_falloff_mask(frame_bgr.shape, face, mask_selection_set_03, TRIS, inner=inner_falloff, feather=feather_falloff, space="3d")
+                            mask_S01 = mesh_soft_falloff_mask(frame_bgr.shape, face, mask_selection_set_01, TRIS, inner=inner_falloff_n, feather=feather_falloff_n, space="3d")
+                            mask_S02 = mesh_soft_falloff_mask(frame_bgr.shape, face, mask_selection_set_02, TRIS, inner=inner_falloff_n, feather=feather_falloff_n, space="3d")
+                            mask_S03 = mesh_soft_falloff_mask(frame_bgr.shape, face, mask_selection_set_03, TRIS, inner=inner_falloff_n, feather=feather_falloff_n, space="3d")
 
                             mask = np.maximum(mask_S01, mask_S02)
                             mask = np.maximum(mask, mask_S03)
@@ -284,10 +281,10 @@ def trackFaceMasks(images,**kargs):
                             if grow_selection != 0: ############## Grow Selection
                                 mask_selection_set = expand_selection(mask_selection_set, steps=grow_selection)
 
-                            mask = mesh_soft_falloff_mask(frame_bgr.shape, face, mask_selection_set, TRIS, inner=inner_falloff, feather=feather_falloff, space="3d")
+                            mask = mesh_soft_falloff_mask(frame_bgr.shape, face, mask_selection_set, TRIS, inner=inner_falloff_n, feather=feather_falloff_n, space="3d")
                             
                         ########################## Eye Fix
-                        if mask_selection == "L_Eye" or optional_selection == "R_Eye":
+                        if mask_selection == "L_Eye" or mask_selection == "R_Eye":
                             mask_eye_fix = hard_mask_from_indices_convex(frame_bgr.shape, face, mask_selection_set)
                             mask = np.maximum(mask_eye_fix, mask)
 
@@ -305,9 +302,9 @@ def trackFaceMasks(images,**kargs):
                                 optional_selection_set_02 = expand_selection(optional_selection_set_02, steps=grow_selection, n_vertices=len(face))
                                 optional_selection_set_03 = expand_selection(optional_selection_set_03, steps=grow_selection, n_vertices=len(face))
 
-                            mask_S01 = mesh_soft_falloff_mask(frame_bgr.shape, face, optional_selection_set_01, TRIS, inner=inner_falloff, feather=feather_falloff, space="3d")
-                            mask_S02 = mesh_soft_falloff_mask(frame_bgr.shape, face, optional_selection_set_02, TRIS, inner=inner_falloff, feather=feather_falloff, space="3d")
-                            mask_S03 = mesh_soft_falloff_mask(frame_bgr.shape, face, optional_selection_set_03, TRIS, inner=inner_falloff, feather=feather_falloff, space="3d")
+                            mask_S01 = mesh_soft_falloff_mask(frame_bgr.shape, face, optional_selection_set_01, TRIS, inner=inner_falloff_n, feather=feather_falloff_n, space="3d")
+                            mask_S02 = mesh_soft_falloff_mask(frame_bgr.shape, face, optional_selection_set_02, TRIS, inner=inner_falloff_n, feather=feather_falloff_n, space="3d")
+                            mask_S03 = mesh_soft_falloff_mask(frame_bgr.shape, face, optional_selection_set_03, TRIS, inner=inner_falloff_n, feather=feather_falloff_n, space="3d")
 
                             mask = np.maximum(mask_S01, mask_S02)
                             mask = np.maximum(mask, mask_S03)
@@ -316,10 +313,10 @@ def trackFaceMasks(images,**kargs):
                             if grow_selection != 0: ############## Grow Selection
                                 optional_selection_set = expand_selection(optional_selection_set, steps=grow_selection)
 
-                            mask = mesh_soft_falloff_mask(frame_bgr.shape, face, optional_selection_set, TRIS, inner=inner_falloff, feather=feather_falloff, space="3d")
+                            mask = mesh_soft_falloff_mask(frame_bgr.shape, face, optional_selection_set, TRIS, inner=inner_falloff_n, feather=feather_falloff_n, space="3d")
                             
                         ########################## Eye Fix
-                        if mask_selection == "L_Eye" or optional_selection == "R_Eye":
+                        if optional_selection == "L_Eye" or optional_selection == "R_Eye":
                             mask_eye_fix = hard_mask_from_indices_convex(frame_bgr.shape, face, optional_selection_set)
                             mask = np.maximum(mask_eye_fix, mask)
                         
@@ -437,23 +434,23 @@ def hard_mask_from_indices_convex(frame_shape, landmarks, indices):
 
 def build_tris_once(landmarks):
     # landmarks: one face (result.face_landmarks[0])
-    P = np.array([[lm.x, lm.y] for lm in landmarks], np.float32)  # normalized coords
-    tri = Delaunay(P)                                             # index-based simplices
-    return tri.simplices.copy()      
+    P = np.array([[lm.x, lm.y] for lm in landmarks], np.float32)
+    tri = Delaunay(P)
+    return tri.simplices.copy()
 
 def soften_mask(mask01, inner_px=0, feather_px=40):
     # mask01 is float32 in [0,1]
     binmask = (mask01*255).astype(np.uint8)
-    dist_in  = cv2.distanceTransform(binmask, cv2.DIST_L2, 3)          # inside→edge
-    dist_out = cv2.distanceTransform(255 - binmask, cv2.DIST_L2, 3)    # outside→edge
+    dist_in  = cv2.distanceTransform(binmask, cv2.DIST_L2, 3)
+    dist_out = cv2.distanceTransform(255 - binmask, cv2.DIST_L2, 3)
     # signed distance (negative inside)
     sdf = dist_out - dist_in
     t = (sdf + inner_px) / max(1e-6, feather_px)
     t = np.clip(t, 0, 1)
-    t = t*t*(3 - 2*t)   # smoothstep
+    t = t*t*(3 - 2*t) # smoothstep
     return 1.0 - t
 
-def chin_indices(landmarks, idx_oval, mouth_center_idx=13):  # 13 is good for lower lip center on 468 mesh
+def chin_indices(landmarks, idx_oval, mouth_center_idx=13): 
     ys = np.array([landmarks[i].y for i in idx_oval])
     y_thresh = landmarks[mouth_center_idx].y
     return [i for i in idx_oval if landmarks[i].y > y_thresh]
@@ -462,24 +459,22 @@ def forehead_indices(landmarks, idx_oval, brow_idx):
     brow_y = np.median([landmarks[i].y for i in brow_idx])
     return [i for i in idx_oval if landmarks[i].y < brow_y]
 
-# NOSE_SEEDS = [4, 1, 6,8]  # tip/bridge vicinity; adjust as needed
-NOSE_SEEDS = [168, 6, 197, 195, 5, 4]  # or [1, 6, 197, 195, 5, 4]
 
+NOSE_SEEDS = [168, 6, 197, 195, 5, 4]
 RIGHT_IRIS = [468,469,470,471,472]
 LEFT_IRIS  = [473,474,475,476,477]
 
 def mesh_soft_falloff_mask(frame_shape, landmarks, seed_indices,
                                  TRIS, inner=0.03, feather=0.06, space="3d"):
-
     H, W = frame_shape[:2]
     # coords for distance metric
     if space == "3d":
-        P = np.array([[lm.x, lm.y, lm.z] for lm in landmarks], np.float32)  # N×3
+        P = np.array([[lm.x, lm.y, lm.z] for lm in landmarks], np.float32)  
     else:
-        P = np.array([[lm.x*W, lm.y*H] for lm in landmarks], np.float32)    # N×2
+        P = np.array([[lm.x*W, lm.y*H] for lm in landmarks], np.float32)    
 
     # pixel coords for rasterization (keep float)
-    Ppx = np.array([[lm.x*W, lm.y*H] for lm in landmarks], np.float32)      # N×2
+    Ppx = np.array([[lm.x*W, lm.y*H] for lm in landmarks], np.float32)      
 
     # adjacency from tessellation (build once per run)
     N = len(landmarks)
@@ -511,7 +506,6 @@ def mesh_soft_falloff_mask(frame_shape, landmarks, seed_indices,
     t  = np.clip(t, 0.0, 1.0)
     wv = (1.0 - (t*t*(3.0 - 2.0*t))).astype(np.float32)  # per-vertex weights
 
-    # rasterize with FIXED TRIS (float barycentrics + epsilon)
     mask = np.zeros((H, W), np.float32)
     eps  = 1e-6
     for i,j,k in TRIS:
@@ -531,11 +525,10 @@ def mesh_soft_falloff_mask(frame_shape, landmarks, seed_indices,
                     if v > mask[y, x]:
                         mask[y, x] = v
 
-    mask = np.clip(mask, 0.0, 1.0)
-    return mask
+    return np.clip(mask, 0.0, 1.0)
+
 
 def mask_convert_format(frame):
-
     frame_f32 = frame.astype(np.float32) # to float32 / Expected range is [0..1] per pixel.
     frame_f32_02  = frame_f32[..., None] #  H×W to H×W×1. This lets NumPy broadcast the mask across the 3 color channels when you multiply/add with an image (H×W×3).
     return frame_f32_02

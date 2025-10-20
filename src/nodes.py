@@ -49,21 +49,21 @@ class FaceTrackingMasks:
                             "min_face_presence_confidence": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.01}),
                             "min_tracking_confidence": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.01}),
                             ### Mask Selection
-                            "mask_selection": (["None", "L_Eye", "R_Eye", "L_Eyebrow", "R_Eyebrow","Brow_Ridge","Nose", "Lips","Chin","Face"], {"default": "None"}),
-                            "optional_selection": (["None", "L_Eye", "R_Eye", "L_Eyebrow", "R_Eyebrow","Brow_Ridge","Nose", "Lips","Chin","Face"], {"default": "None"}),
+                            "mask_selection": (["None", "L_Eye", "R_Eye", "L_Eyebrow", "R_Eyebrow","Brow_Ridge","Nose", "Lips","Chin","Face"], {"default": "L_Eye"}),
+                            "optional_selection": (["None", "L_Eye", "R_Eye", "L_Eyebrow", "R_Eyebrow","Brow_Ridge","Nose", "Lips","Chin","Face"], {"default": "R_Eye"}),
                             "grow_selection": ("INT", {"default": 0, "min": 0, "step": 1}),
                             ### Fall off
                             "falloff_mode": (["simple-2D", "mesh-aware-3D"], {"default": "simple-2D"}),
-                            "inner_falloff": ("FLOAT", {"default": .1, "min": -20,"max": 20, "step": 0.01}),
-                            "feather_falloff": ("FLOAT", {"default": .1, "min": 0, "step": 0.01}),
+                            "inner_falloff": ("FLOAT", {"default": 0, "min": -20,"max": 20, "step": 0.01}),
+                            "feather_falloff": ("FLOAT", {"default": 0, "min": 0, "step": 0.01}),
                             ### Post Blur / Smooth
-                            "post_blur_2D": ("FLOAT", {"default": .1, "min": 0, "step": 0.01}),
+                            "post_blur_2D": ("FLOAT", {"default": 0, "min": 0, "step": 0.01}),
                             "post_remap_in_min": ("FLOAT", {"default": 0, "min": 0, "step": 0.01}),
                             "post_remap_in_max": ("FLOAT", {"default": 1, "min": 0, "step": 0.01}),
                             "post_remap_out_min": ("FLOAT", {"default": 0, "min": 0, "max": 1, "step": 0.01}),
                             "post_remap_out_max": ("FLOAT", {"default": 1, "min": 0, "max": 1,"step": 0.01}),
                             ### output options
-                            "output_mode": (["mask", "visualisation"], {"default": ""}),
+                            "output_mode": (["mask", "visualisation"], {"default": "visualisation"}),
                             "vis_colour": (["White","Red","Green","Blue","Yellow","Purple","Cyan"], {"default": "Yellow"}),
                             }}
     
@@ -119,7 +119,7 @@ class FaceTrackingFeatures:
                             "face_points_vis": ("BOOLEAN", {"default": True}),
                             "face_points_radius": ("INT", {"default": 2, "min": 1, "max": 20, "step": 1}),
                             ### output options
-                            "output_mode": (["mask", "visualisation"], {"default": ""}),
+                            "output_mode": (["mask", "visualisation"], {"default": "visualisation"}),
                             }}
     
     RETURN_TYPES = ("IMAGE",)

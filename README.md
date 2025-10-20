@@ -2,7 +2,7 @@
 
 A personal sandbox of custom Comfy UI nodes. 
 
-**Note: Currently the nodes have been written as quick prototypes as opposed to production-ready code. Lots of clean up, refactoring and error checking still needed**
+**Note: Currently the nodes have been written as quick prototypes as opposed to production-ready code. Lots of testing, clean up, refactoring and error checking still needed**
 
 # Nodes
 
@@ -21,13 +21,13 @@ A personal sandbox of custom Comfy UI nodes.
  - Mask region expansion 
  - Mask falloff options: 
     - "simple-2D": Fast method. Simple 2D falloff in pixel space. The core mask is still mapped in 3D space, but the falloff is in screen space. Best for front-on perspectives. 
-    - "mesh-aware-3D": Slower method. Creates a falloff that follows the contours of the face on the face mesh directly. Note: This method currently has some known bugs and is currently prone to artifacts.
+    - "mesh-aware-3D": Slower method / **Experimental**. Creates a falloff that follows the contours of the face on the face mesh directly. Note: This has fairly sensitive range of small values that are stable, when extending beyond 0.05 flickering will occur. post_blur_2d can be used to help smooth out the flicker and is recommended when experiencing artefacts. 
 
 ### **Node Parameter**
 
 | <img src=".\content\faceTrackingMasks\node_ui.png" width="70%"> | <img src=".\content\faceTrackingMasks\faceTrackingMasks_brow_ridge.webp" width="100%"> | <img src=".\content\faceTrackingMasks\faceTrackingMasks_brow_ridge_mask.webp" width="100%"> |
 |---|---|---|
-| Node UI | Brow Ridge / mesh-aware-3D / feather_falloff = 60, grow_selection = 1, post_blur_2d=7 | output_mode: mask|
+| Node UI | Brow Ridge / mesh-aware-3D / feather_falloff = .06, grow_selection = 1, post_blur_2d=7 | output_mode: mask|
 
 - **Face Tracking (MediaPipe)**
     - **frame_rate**: Input FPS
@@ -39,7 +39,7 @@ A personal sandbox of custom Comfy UI nodes.
     - **optional_selection**: "L_Eye", "R_Eye", "L_Eyebrow", "R_Eyebrow","Brow_Ridge","Nose", "Lips","Chin","Face"
     - **grow_selection**: Expands the selection to neighbouring points on the face mesh.
 - **Falloff**
-    - **falloff_mode**: "simple-2D", "mesh-aware-3D" – Note: "inner_falloff" and "feather_falloff" will need to be re-adjusted based on which falloff method is selected. "mesh-aware-3D" requires much smaller values.
+    - **falloff_mode**: "simple-2D", "mesh-aware-3D" – Note: "inner_falloff" and "feather_falloff" will need to be re-adjusted based on which falloff method is selected. "mesh-aware-3D" requires much smaller values, currently only stable with a feather_falloff <= 0.05, anything greater will require post_blur_2D to attempt to smooth out the flicker, generally post blur is recommended when experiencing artefacts while using mesh-aware-3D method. 
     - **inner_falloff**: The internal distance of the soft falloff; larger values create a softer mask. Note: Set to 0 for hard edge mask
     - **feather_falloff**: The external distance of the soft falloff; larger values create a softer mask.  Note: Set to 0 for hard edge mask
 - **Post Operations**
@@ -53,18 +53,18 @@ A personal sandbox of custom Comfy UI nodes.
     - **vis_colour**: A selection of different colours used in visualisation mode.
 
 ### **To Do**
+ - Testing
  - General clean-up of code and refactoring. 
  - Additional testing / unit testing needs to be set up. 
- - Fix first frame pop, feather falloff and artifacts in mesh-aware-3D mode.
+ - Explore more robust "mesh-aware-3D" alternatives to geometry based falloffs.
  - Update method of generating surfacing from face mesh verts. Currently, it uses a convex hull for simplicity; however, this causes issues when representing facial contours accurately.
  - All outputs are generated as images of type RGB BxWxHxC. An optional direct mask output type will be included.
- - Mesh-aware-3D has limitations due to the face mesh topology produced by the MediaPipe Face Landmarker model, resulting in occasional artefacts in the mask. This can mostly be resolved by falloff settings and post-2D blur. More work can be done to make this option more robust overall. 
  - Falloff settings need to be further normalised to ensure a less drastic shift in the output due to falloff method switching. 
  - Allow multiple face generation.
 
 ## G-One Face Tracking Features
 
-**Description:** A wrapper for MediaPipe's Face Landmarker model. Draws MediaPipe FaceMesh features on image frames (ComfyUI node). Supports per-group toggles (brows, lids, lips, face oval, irises) with configurable colors/thickness, and optional vertex markers.Note: This is currently only configured to process one face.
+**Description:** A simple wrapper for MediaPipe's Face Landmarker model. Draws MediaPipe FaceMesh features. Supports per-group toggles (left brow, right eyes lips, etc) with configurable thickness and optional vertex markers.Note: This is currently only configured to process one face.
 
 
 | <img src=".\content\faceTrackingFeatures\faceTrackingFeatures_all.webp" width="100%"> | <img src=".\content\faceTrackingFeatures\faceTrackingFeatures_eyes_eyebrows.webp" width="100%"> | <img src=".\content\faceTrackingFeatures\faceTrackingFeatures_lips.webp" width="100%"> |
